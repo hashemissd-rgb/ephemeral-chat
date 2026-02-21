@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ephemeral Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #F7F4EF;
+  --surface:   #FFFFFF;
+  --border:    #E4DED5;
+  --text:      #1A1714;
+  --muted:     #9B9389;
+  --accent:    #2D5016;
+  --accent-lt: #EEF4E8;
+  --accent-bd: #C8DFB0;
+  --other-bg:  #F0EDE9;
+  --other-bd:  #DDD8D2;
+  --danger:    #C0392B;
+  --online:    #27AE60;
+  --shadow:    0 2px 16px rgba(0,0,0,0.08);
+  --radius:    14px;
+}
+
+body {
+  font-family: 'Instrument Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* ── SCREENS ── */
+.screen { display: none; width: 100%; }
+.screen.active { display: flex; }
+
+/* ──────────────────────────────────────────────
+   LANDING SCREEN
+────────────────────────────────────────────── */
+#landingScreen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 100vh;
+  animation: fadeUp 0.5s ease both;
+}
+
+.landing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 44px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  background: var(--accent);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-mark svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.logo-name {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.landing-headline {
+  font-family: 'Instrument Serif', serif;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+
+.landing-sub {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 15px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(45,80,22,0.08);
+}
+
+input[type="text"]::placeholder { color: var(--muted); }
+
+.error-msg {
+  font-size: 13px;
+  color: var(--danger);
+  min-height: 18px;
+  display: none;
+}
+
+.error-msg.show { display: block; }
+
+.join-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.join-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.join-btn:active { transform: translateY(0); }
+.join-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+.privacy-note {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: var(--accent-lt);
+  border: 1px solid var(--accent-bd);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--accent);
+  line-height: 1.6;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.privacy-note svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ──────────────────────────────────────────────
+   CHAT SCREEN
+────────────────────────────────────────────── */
+#chatScreen {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  animation: fadeUp 0.4s ease both;
+}
+
+.chat-shell {
+  width: 100%;
+  max-width: 680px;
+  height: min(720px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+/* Header */
+.chat-header {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.chat-logo {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.chat-logo svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.chat-header-info { flex: 1; }
+
+.chat-room-name {
+  font-family: 'Instrument Serif', serif;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.chat-room-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.online-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--online);
+  display: inline-block;
+}
+
+.my-badge {
+  font-size: 12px;
+  background: var(--accent-lt);
+  color: var(--accent);
+  border: 1px solid var(--accent-bd);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* Messages */
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 22px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.messages-area::-webkit-scrollbar { width: 4px; }
+.messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.empty-room {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 40px;
+  pointer-events: none;
+}
+
+.empty-icon {
+  font-size: 36px;
+  opacity: 0.35;
+}
+
+.empty-label { font-size: 14px; font-style: italic; }
+
+/* System event messages */
+.sys-event {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 10px 0 6px;
+  font-style: italic;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Message rows */
+.msg-row {
+  display: flex;
+  flex-direction: column;
+  max-width: 75%;
+  animation: msgIn 0.22s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.msg-row.mine   { align-self: flex-end; align-items: flex-end; }
+.msg-row.theirs { align-self: flex-start; align-items: flex-start; }
+
+.msg-sender {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+  padding: 0 4px;
+  letter-spacing: 0.02em;
+}
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.msg-row.mine .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg-row.theirs .bubble {
+  background: var(--other-bg);
+  border: 1px solid var(--other-bd);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.msg-time {
+  font-size: 10.5px;
+  color: var(--muted);
+  padding: 3px 4px 0;
+}
+
+/* Spacing between same-sender runs vs different */
+.msg-row + .msg-row.mine,
+.msg-row + .msg-row.theirs { margin-top: 10px; }
+.msg-row.mine + .msg-row.mine,
+.msg-row.theirs + .msg-row.theirs { margin-top: 2px; }
+
+/* Typing */
+.typing-bar {
+  padding: 4px 22px 6px;
+  min-height: 22px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+/* Input area */
+.input-area {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.msg-input {
+  flex: 1;
+  padding: 11px 16px;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 14.5px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  resize: none;
+  min-height: 44px;
+  max-height: 130px;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.msg-input::placeholder { color: var(--muted); }
+.msg-input:focus { border-color: var(--accent); }
+
+.send-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.send-btn:hover { opacity: 0.85; transform: scale(1.05); }
+.send-btn:active { transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
+.send-btn svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Connecting overlay ── */
+.connecting {
+  position: fixed;
+  inset: 0;
+  background: rgba(247,244,239,0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 100;
+  font-size: 14px;
+  color: var(--muted);
+  display: none;
+}
+
+.connecting.show { display: flex; }
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 500px) {
+  .landing-card { padding: 32px 24px; }
+  .chat-shell { border-radius: 0; height: 100vh; max-width: 100%; }
+  body { padding: 0; }
+  #chatScreen { padding: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Connecting overlay ── -->
+<div class="connecting" id="connecting">
+  <div class="spinner"></div>
+  <span>Connecting…</span>
+</div>
+
+<!-- ── LANDING ── -->
+<div class="screen active" id="landingScreen">
+  <div class="landing-card">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="logo-name">Ephemeral</div>
+    </div>
+
+    <div class="landing-headline">Chat that leaves<br><em>no trace.</em></div>
+    <div class="landing-sub">Enter a display name to join. When you leave, everything disappears — no history, no logs, no record.</div>
+
+    <div class="form-group">
+      <label for="nicknameInput">Display name</label>
+      <input type="text" id="nicknameInput" placeholder="e.g. Alex" maxlength="30" autocomplete="off" autofocus />
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <button class="join-btn" id="joinBtn" disabled>Join Chat Room →</button>
+
+    <div class="privacy-note">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>No account needed. Messages exist only in memory and are wiped the moment you disconnect or refresh.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHAT ── -->
+<div class="screen" id="chatScreen">
+  <div class="chat-shell">
+    <div class="chat-header">
+      <div class="chat-logo">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="chat-header-info">
+        <div class="chat-room-name">Chat Room</div>
+        <div class="chat-room-sub">
+          <span class="online-pip"></span>
+          <span id="onlineCount">1 online</span>
+        </div>
+      </div>
+      <div class="my-badge" id="myBadge"></div>
+    </div>
+
+    <div class="messages-area" id="messagesArea">
+      <div class="empty-room" id="emptyRoom">
+        <div class="empty-icon">💬</div>
+        <div class="empty-label">Be the first to say something.</div>
+      </div>
+    </div>
+
+    <div class="typing-bar" id="typingBar"></div>
+
+    <div class="input-area">
+      <textarea class="msg-input" id="msgInput" placeholder="Type a message…" rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Socket.io client — loaded from same server -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* ══════════════════════════════════════════════
+   EPHEMERAL CHAT — CLIENT
+   - Zero persistence: all state is in JS memory
+   - Refresh = blank slate, treated as new user
+   - No localStorage / sessionStorage usage
+══════════════════════════════════════════════ */
+
+// ── State (all in RAM, wiped on refresh/close) ──
+let myNickname   = null;
+let socket       = null;
+let typingTimer  = null;
+let typingMap    = new Map(); // nickname → timeoutId
+let msgCount     = 0;
+
+// ── DOM refs ──
+const landingScreen  = document.getElementById('landingScreen');
+const chatScreen     = document.getElementById('chatScreen');
+const nicknameInput  = document.getElementById('nicknameInput');
+const joinBtn        = document.getElementById('joinBtn');
+const errorMsg       = document.getElementById('errorMsg');
+const messagesArea   = document.getElementById('messagesArea');
+const emptyRoom      = document.getElementById('emptyRoom');
+const msgInput       = document.getElementById('msgInput');
+const sendBtn        = document.getElementById('sendBtn');
+const typingBar      = document.getElementById('typingBar');
+const onlineCount    = document.getElementById('onlineCount');
+const myBadge        = document.getElementById('myBadge');
+const connecting     = document.getElementById('connecting');
+
+// ── Nickname input validation ──
+nicknameInput.addEventListener('input', () => {
+  joinBtn.disabled = nicknameInput.value.trim().length < 1;
+  hideError();
+});
+
+nicknameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); attemptJoin(); }
+});
+
+joinBtn.addEventListener('click', attemptJoin);
+
+function attemptJoin() {
+  const name = nicknameInput.value.trim();
+  if (!name) return;
+  joinBtn.disabled = true;
+  connecting.classList.add('show');
+  initSocket(name);
+}
+
+// ── Socket init ──
+function initSocket(nickname) {
+  socket = io({ transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    socket.emit('join', nickname);
+  });
+
+  socket.on('connect_error', () => {
+    connecting.classList.remove('show');
+    showError('Could not connect to server. Is it running?');
+    joinBtn.disabled = false;
+  });
+
+  socket.on('join_success', ({ nickname: confirmedName, onlineCount: count }) => {
+    myNickname = confirmedName;
+    connecting.classList.remove('show');
+    showChatScreen(confirmedName, count);
+  });
+
+  socket.on('join_error', (msg) => {
+    connecting.classList.remove('show');
+    showError(msg);
+    joinBtn.disabled = false;
+    socket.disconnect();
+  });
+
+  socket.on('message', (msg) => {
+    appendMessage(msg);
+    // Clear typing for this sender when message arrives
+    clearTypingFor(msg.nickname);
+  });
+
+  socket.on('user_joined', ({ nickname: who, onlineCount: count }) => {
+    if (who !== myNickname) addSysEvent(`${who} joined the room`);
+    updateOnlineCount(count);
+  });
+
+  socket.on('user_left', ({ nickname: who, onlineCount: count }) => {
+    addSysEvent(`${who} left the room`);
+    updateOnlineCount(count);
+    clearTypingFor(who);
+  });
+
+  socket.on('typing', ({ nickname: who, isTyping }) => {
+    if (isTyping) {
+      showTypingFor(who);
+    } else {
+      clearTypingFor(who);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    // Page is closing or server dropped — do nothing, browser clears state
+  });
+}
+
+// ── Show chat screen ──
+function showChatScreen(name, count) {
+  landingScreen.classList.remove('active');
+  chatScreen.classList.add('active');
+  myBadge.textContent = name;
+  updateOnlineCount(count);
+  msgInput.focus();
+}
+
+// ── Online count ──
+function updateOnlineCount(count) {
+  onlineCount.textContent = `${count} online`;
+}
+
+// ── System event line ──
+function addSysEvent(text) {
+  const el = document.createElement('div');
+  el.className = 'sys-event';
+  el.textContent = text;
+  removeEmpty();
+  messagesArea.appendChild(el);
+  scrollBottom();
+}
+
+// ── Append message ──
+function appendMessage({ nickname, text, timestamp }) {
+  removeEmpty();
+  msgCount++;
+
+  const isMe = nickname === myNickname;
+  const time  = formatTime(timestamp);
+
+  // Check if same sender as previous message bubble
+  const lastRow = messagesArea.querySelector('.msg-row:last-of-type');
+  const sameSender = lastRow && lastRow.dataset.sender === nickname;
+
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMe ? 'mine' : 'theirs'}`;
+  row.dataset.sender = nickname;
+
+  if (!sameSender) {
+    const senderEl = document.createElement('div');
+    senderEl.className = 'msg-sender';
+    senderEl.textContent = isMe ? 'You' : nickname;
+    row.appendChild(senderEl);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = text; // already sanitized server-side
+
+  const timeEl = document.createElement('div');
+  timeEl.className = 'msg-time';
+  timeEl.textContent = time;
+
+  row.appendChild(bubble);
+  row.appendChild(timeEl);
+  messagesArea.appendChild(row);
+  scrollBottom();
+}
+
+function removeEmpty() {
+  if (emptyRoom) emptyRoom.style.display = 'none';
+}
+
+function scrollBottom() {
+  messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Typing indicators ──
+function showTypingFor(who) {
+  clearTimeout(typingMap.get(who));
+  typingMap.set(who, setTimeout(() => clearTypingFor(who), 3000));
+  renderTyping();
+}
+
+function clearTypingFor(who) {
+  clearTimeout(typingMap.get(who));
+  typingMap.delete(who);
+  renderTyping();
+}
+
+function renderTyping() {
+  const names = [...typingMap.keys()];
+  if (names.length === 0) {
+    typingBar.textContent = '';
+  } else if (names.length === 1) {
+    typingBar.textContent = `${names[0]} is typing…`;
+  } else {
+    typingBar.textContent = `${names.slice(0,-1).join(', ')} and ${names.at(-1)} are typing…`;
+  }
+}
+
+// ── Message sending ──
+msgInput.addEventListener('input', () => {
+  sendBtn.disabled = msgInput.value.trim() === '';
+  autoResize();
+  if (socket) {
+    socket.emit('typing', true);
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => socket.emit('typing', false), 1500);
+  }
+});
+
+msgInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    doSend();
+  }
+});
+
+sendBtn.addEventListener('click', doSend);
+
+function doSend() {
+  const text = msgInput.value.trim();
+  if (!text || !socket) return;
+  socket.emit('message', text);
+  socket.emit('typing', false);
+  clearTimeout(typingTimer);
+  msgInput.value = '';
+  autoResize();
+  sendBtn.disabled = true;
+  msgInput.focus();
+}
+
+function autoResize() {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 130) + 'px';
+}
+
+// ── Error display ──
+function showError(msg) {
+  errorMsg.textContent = msg;
+  errorMsg.classList.add('show');
+}
+
+function hideError() {
+  errorMsg.classList.remove('show');
+}
+
+/* ── No persistence guarantee ──
+   There is no localStorage, sessionStorage, or IndexedDB usage anywhere.
+   The socket disconnects automatically on page close/refresh.
+   The server wipes logs when the room empties.
+   This page treats every load as a fresh session.
+*/
+</script>
+</body>
+</html>
