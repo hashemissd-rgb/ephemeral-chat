@@ -3,808 +3,992 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ephemeral Chat</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<title>English Proficiency Examination</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB4MJjFySNuDIO9YqMK5OkVACt_aKernvk",
+    authDomain: "english-test-4256a.firebaseapp.com",
+    projectId: "english-test-4256a",
+    storageBucket: "english-test-4256a.firebasestorage.app",
+    messagingSenderId: "463757363601",
+    appId: "1:463757363601:web:c12cd4c56edd69c6bf3230",
+    measurementId: "G-PVDQ9PJEZ6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ── Expose db + helpers to global scope ──
+  window._db = db;
+  window._fbModules = { collection, addDoc, query, where, getDocs, doc, setDoc, getDoc };
+
+  // ── Save result to Firestore ──
+  window.saveResultToFirestore = async function(result) {
+    try {
+      const { collection, addDoc } = window._fbModules;
+      await addDoc(collection(db, "exam_results"), result);
+      console.log("Result saved to Firestore.");
+    } catch (e) {
+      console.error("Error saving result:", e);
+    }
+  };
+
+  // ── Get all results from Firestore ──
+  window.getAllResults = async function() {
+    try {
+      const { collection, getDocs } = window._fbModules;
+      const snap = await getDocs(collection(db, "exam_results"));
+      return snap.docs.map(d => d.data());
+    } catch (e) {
+      console.error("Error fetching results:", e);
+      return [];
+    }
+  };
+
+  // ── Get used question IDs for a student (by normalised name) ──
+  window.getUsedQuestionIds = async function(nameKey) {
+    try {
+      const { doc, getDoc } = window._fbModules;
+      const ref = doc(db, "student_question_history", nameKey);
+      const snap = await getDoc(ref);
+      if (snap.exists()) return snap.data().usedIds || [];
+      return [];
+    } catch (e) {
+      console.error("Error fetching question history:", e);
+      return [];
+    }
+  };
+
+  // ── Save used question IDs for a student ──
+  window.saveUsedQuestionIds = async function(nameKey, ids) {
+    try {
+      const { doc, setDoc } = window._fbModules;
+      const ref = doc(db, "student_question_history", nameKey);
+      await setDoc(ref, { usedIds: ids }, { merge: true });
+    } catch (e) {
+      console.error("Error saving question history:", e);
+    }
+  };
+</script>
+
 <style>
-/* ── Reset ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg:        #F7F4EF;
-  --surface:   #FFFFFF;
-  --border:    #E4DED5;
-  --text:      #1A1714;
-  --muted:     #9B9389;
-  --accent:    #2D5016;
-  --accent-lt: #EEF4E8;
-  --accent-bd: #C8DFB0;
-  --other-bg:  #F0EDE9;
-  --other-bd:  #DDD8D2;
-  --danger:    #C0392B;
-  --online:    #27AE60;
-  --shadow:    0 2px 16px rgba(0,0,0,0.08);
-  --radius:    14px;
-}
+  :root {
+    --navy: #0b1d35;
+    --navy-light: #122544;
+    --navy-mid: #1a3358;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --gold-dim: #9b7f3a;
+    --cream: #f5f0e8;
+    --cream-dim: #c8bfae;
+    --white: #ffffff;
+    --green: #2e7d52;
+    --red: #8b2e2e;
+    --border: rgba(201,168,76,0.25);
+    --border-mid: rgba(201,168,76,0.45);
+  }
 
-body {
-  font-family: 'Instrument Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
+  body {
+    background: var(--navy);
+    color: var(--cream);
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    line-height: 1.7;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,168,76,0.06) 0%, transparent 70%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c9a84c' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
 
-/* ── SCREENS ── */
-.screen { display: none; width: 100%; }
-.screen.active { display: flex; }
+  .page { display: none; min-height: 100vh; }
+  .page.active { display: flex; flex-direction: column; }
 
-/* ──────────────────────────────────────────────
-   LANDING SCREEN
-────────────────────────────────────────────── */
-#landingScreen {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  min-height: 100vh;
-  animation: fadeUp 0.5s ease both;
-}
+  .site-header {
+    text-align: center;
+    padding: 3rem 2rem 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .crest {
+    width: 64px; height: 64px; margin: 0 auto 1.2rem;
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cormorant Garamond', serif; font-size: 28px; color: var(--navy); font-weight: 600;
+  }
+  .site-header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    font-weight: 300; letter-spacing: 0.15em; color: var(--cream);
+    text-transform: uppercase;
+  }
+  .site-header .subtitle {
+    font-size: 0.75rem; letter-spacing: 0.3em; color: var(--gold);
+    text-transform: uppercase; margin-top: 0.4rem;
+  }
 
-.landing-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 48px 44px;
-  max-width: 420px;
-  width: 100%;
-  box-shadow: var(--shadow);
-}
+  .main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .card {
+    background: var(--navy-light);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3rem;
+    width: 100%; max-width: 540px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.7rem; font-weight: 400; color: var(--cream);
+    margin-bottom: 0.3rem;
+  }
+  .card-sub { font-size: 0.8rem; letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; margin-bottom: 2rem; }
 
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 32px;
-}
+  label { display: block; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 0.5rem; }
+  input[type="text"], input[type="password"] {
+    width: 100%; padding: 0.85rem 1rem;
+    background: var(--navy); border: 1px solid var(--border-mid);
+    color: var(--cream); font-family: 'Jost', sans-serif; font-size: 0.95rem;
+    border-radius: 2px; outline: none; transition: border-color 0.2s;
+  }
+  input[type="text"]:focus, input[type="password"]:focus { border-color: var(--gold); }
+  input[type="text"]::placeholder, input[type="password"]::placeholder { color: rgba(245,240,232,0.25); }
 
-.logo-mark {
-  width: 36px;
-  height: 36px;
-  background: var(--accent);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+  .btn {
+    display: inline-block; width: 100%; padding: 0.9rem 2rem;
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    color: var(--navy); font-family: 'Jost', sans-serif; font-size: 0.85rem;
+    font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+    border: none; border-radius: 2px; cursor: pointer; margin-top: 1.5rem;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.99); }
+  .btn-outline {
+    background: transparent; color: var(--gold); border: 1px solid var(--gold-dim);
+    margin-top: 0.8rem;
+  }
+  .btn-outline:hover { background: rgba(201,168,76,0.08); }
 
-.logo-mark svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .err { font-size: 0.82rem; color: #e87070; margin-top: 0.6rem; display: none; }
+  .form-group { margin-bottom: 1.5rem; }
 
-.logo-name {
-  font-family: 'Instrument Serif', serif;
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  color: var(--text);
-}
+  .site-footer {
+    text-align: center; padding: 1.5rem; border-top: 1px solid var(--border);
+    font-size: 0.72rem; letter-spacing: 0.15em; color: rgba(245,240,232,0.3); text-transform: uppercase;
+  }
 
-.landing-headline {
-  font-family: 'Instrument Serif', serif;
-  font-size: 30px;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  margin-bottom: 10px;
-}
+  #page-exam .main { align-items: flex-start; }
+  .exam-wrap { width: 100%; max-width: 760px; margin: 0 auto; }
 
-.landing-sub {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.6;
-  margin-bottom: 32px;
-}
+  .exam-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1rem 1.5rem; margin-bottom: 2rem;
+  }
+  .exam-topbar .student-info { font-size: 0.8rem; color: var(--cream-dim); }
+  .exam-topbar .student-info strong { color: var(--cream); display: block; font-size: 1rem; font-weight: 500; }
+  .timer-box { text-align: right; }
+  .timer-box .timer-label { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim); }
+  .timer-box .timer-val { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--gold); line-height: 1; }
+  .timer-box.warning .timer-val { color: #e87070; }
 
-.form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .progress-bar { background: var(--navy-mid); height: 4px; border-radius: 2px; margin-bottom: 2rem; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); border-radius: 2px; transition: width 0.4s ease; }
 
-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: 0.01em;
-}
+  .question-card {
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2.5rem; margin-bottom: 1.5rem;
+    position: relative; overflow: hidden;
+  }
+  .question-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .q-number { font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 1rem; }
+  .q-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.35rem; font-weight: 400; color: var(--cream);
+    margin-bottom: 2rem; line-height: 1.5;
+  }
 
-input[type="text"] {
-  width: 100%;
-  padding: 12px 16px;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 15px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
+  .options { display: flex; flex-direction: column; gap: 0.75rem; }
+  .option {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 0.9rem 1.2rem;
+    background: var(--navy); border: 1px solid var(--border);
+    border-radius: 3px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .option:hover { border-color: var(--gold-dim); background: rgba(201,168,76,0.05); }
+  .option.selected { border-color: var(--gold); background: rgba(201,168,76,0.1); }
+  .option-letter {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--border-mid); display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 500; color: var(--gold-dim); flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .option.selected .option-letter { background: var(--gold); color: var(--navy); border-color: var(--gold); }
+  .option-text { font-size: 0.95rem; }
 
-input[type="text"]:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(45,80,22,0.08);
-}
+  .exam-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; gap: 1rem; }
+  .nav-btn {
+    padding: 0.75rem 2rem; background: transparent;
+    border: 1px solid var(--border-mid); color: var(--cream-dim);
+    font-family: 'Jost', sans-serif; font-size: 0.8rem; letter-spacing: 0.15em;
+    text-transform: uppercase; cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  }
+  .nav-btn:hover { border-color: var(--gold); color: var(--cream); }
+  .nav-btn.primary {
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    color: var(--navy); font-weight: 600; border-color: transparent;
+  }
+  .nav-btn.primary:hover { opacity: 0.9; }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-input[type="text"]::placeholder { color: var(--muted); }
+  .q-counter { font-size: 0.8rem; color: var(--cream-dim); }
+  .q-counter span { color: var(--cream); font-weight: 500; }
 
-.error-msg {
-  font-size: 13px;
-  color: var(--danger);
-  min-height: 18px;
-  display: none;
-}
+  .done-card { text-align: center; max-width: 520px; }
+  .done-icon {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.25));
+    border: 2px solid var(--gold-dim); margin: 0 auto 2rem;
+    display: flex; align-items: center; justify-content: center; font-size: 36px;
+  }
+  .done-card .card-title { font-size: 2rem; }
+  .done-card p { color: var(--cream-dim); margin-top: 0.5rem; font-size: 0.95rem; }
+  .done-card .meta {
+    background: var(--navy); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1rem 1.5rem; margin: 1.5rem 0;
+    font-size: 0.85rem; color: var(--cream-dim);
+  }
+  .done-card .meta strong { color: var(--cream); }
 
-.error-msg.show { display: block; }
+  #page-admin .main { align-items: flex-start; }
+  .admin-wrap { width: 100%; max-width: 1000px; margin: 0 auto; }
 
-.join-btn {
-  width: 100%;
-  padding: 13px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
-}
+  .admin-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;
+  }
+  .admin-header h2 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 400;
+  }
+  .admin-header .admin-badge {
+    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+    background: rgba(201,168,76,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); padding: 0.35rem 0.9rem; border-radius: 2px;
+  }
 
-.join-btn:hover { opacity: 0.88; transform: translateY(-1px); }
-.join-btn:active { transform: translateY(0); }
-.join-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat-card {
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1.2rem; text-align: center;
+  }
+  .stat-card .stat-val {
+    font-family: 'Cormorant Garamond', serif; font-size: 2.2rem;
+    color: var(--gold); line-height: 1;
+  }
+  .stat-card .stat-label { font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cream-dim); margin-top: 0.4rem; }
 
-.privacy-note {
-  margin-top: 20px;
-  padding: 14px 16px;
-  background: var(--accent-lt);
-  border: 1px solid var(--accent-bd);
-  border-radius: 10px;
-  font-size: 12.5px;
-  color: var(--accent);
-  line-height: 1.6;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
+  .results-table-wrap {
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+  }
+  .results-table-wrap .table-header {
+    padding: 1.2rem 1.5rem; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .results-table-wrap .table-header h3 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400;
+  }
+  .export-btn {
+    padding: 0.5rem 1.2rem; background: transparent;
+    border: 1px solid var(--gold-dim); color: var(--gold);
+    font-family: 'Jost', sans-serif; font-size: 0.72rem; letter-spacing: 0.15em;
+    text-transform: uppercase; cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  }
+  .export-btn:hover { background: rgba(201,168,76,0.1); }
 
-.privacy-note svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    padding: 0.8rem 1.2rem; text-align: left;
+    font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--gold-dim); border-bottom: 1px solid var(--border); font-weight: 500;
+  }
+  tbody tr { border-bottom: 1px solid rgba(201,168,76,0.08); transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(201,168,76,0.04); }
+  tbody td { padding: 1rem 1.2rem; font-size: 0.9rem; }
+  .td-name { font-weight: 500; color: var(--cream); }
+  .td-time { color: var(--cream-dim); font-size: 0.85rem; }
 
-/* ──────────────────────────────────────────────
-   CHAT SCREEN
-────────────────────────────────────────────── */
-#chatScreen {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  animation: fadeUp 0.4s ease both;
-}
+  .level-badge {
+    display: inline-block; padding: 0.25rem 0.7rem;
+    border-radius: 2px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;
+  }
+  .level-A1 { background: rgba(80,80,80,0.3); color: #aaa; border: 1px solid rgba(150,150,150,0.3); }
+  .level-A2 { background: rgba(46,125,82,0.2); color: #6ed49a; border: 1px solid rgba(110,212,154,0.3); }
+  .level-B1 { background: rgba(33,95,168,0.2); color: #7ab8f5; border: 1px solid rgba(122,184,245,0.3); }
+  .level-B2 { background: rgba(130,85,0,0.3); color: var(--gold-light); border: 1px solid rgba(232,201,122,0.3); }
+  .level-C1 { background: rgba(139,46,46,0.25); color: #f5a0a0; border: 1px solid rgba(245,160,160,0.3); }
 
-.chat-shell {
-  width: 100%;
-  max-width: 680px;
-  height: min(720px, calc(100vh - 40px));
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: var(--shadow);
-}
+  .score-bar { display: flex; align-items: center; gap: 0.5rem; }
+  .score-mini { height: 6px; flex: 1; background: var(--navy-mid); border-radius: 3px; overflow: hidden; }
+  .score-mini-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); border-radius: 3px; }
+  .score-text { font-size: 0.8rem; color: var(--cream-dim); white-space: nowrap; min-width: 45px; text-align: right; }
+  .correct-count { color: #6ed49a; font-weight: 500; }
+  .wrong-count { color: #f5a0a0; }
 
-/* Header */
-.chat-header {
-  padding: 16px 22px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-  background: var(--surface);
-}
+  .empty-state {
+    text-align: center; padding: 4rem 2rem;
+    color: var(--cream-dim); font-size: 0.9rem;
+  }
+  .empty-state .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
 
-.chat-logo {
-  width: 32px;
-  height: 32px;
-  background: var(--accent);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+  .logout-btn {
+    background: transparent; border: 1px solid rgba(255,255,255,0.15);
+    color: var(--cream-dim); font-family: 'Jost', sans-serif; font-size: 0.75rem;
+    letter-spacing: 0.15em; text-transform: uppercase; padding: 0.5rem 1rem;
+    cursor: pointer; border-radius: 2px; transition: all 0.2s;
+  }
+  .logout-btn:hover { border-color: rgba(255,255,255,0.3); color: var(--cream); }
 
-.chat-logo svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  @media (max-width: 600px) {
+    .card { padding: 2rem 1.5rem; }
+    .exam-topbar { flex-direction: column; gap: 0.5rem; text-align: center; }
+    .timer-box { text-align: center; }
+    .exam-nav { flex-direction: column; }
+    .nav-btn { width: 100%; text-align: center; }
+    thead th:nth-child(4), thead th:nth-child(5), tbody td:nth-child(4), tbody td:nth-child(5) { display: none; }
+  }
 
-.chat-header-info { flex: 1; }
+  .confirm-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(11,29,53,0.9);
+    z-index: 100; align-items: center; justify-content: center; padding: 2rem;
+  }
+  .confirm-overlay.show { display: flex; }
+  .confirm-box {
+    background: var(--navy-light); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2.5rem; max-width: 420px; width: 100%; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .confirm-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .confirm-box h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .confirm-box p { color: var(--cream-dim); font-size: 0.9rem; margin-bottom: 2rem; }
+  .confirm-btns { display: flex; gap: 0.75rem; }
+  .confirm-btns .btn { margin-top: 0; }
 
-.chat-room-name {
-  font-family: 'Instrument Serif', serif;
-  font-size: 17px;
-  letter-spacing: -0.01em;
-}
+  .unanswered-warn { font-size: 0.82rem; color: #e8b870; margin-top: 1rem; text-align: center; display: none; }
 
-.chat-room-sub {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 1px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.online-pip {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--online);
-  display: inline-block;
-}
-
-.my-badge {
-  font-size: 12px;
-  background: var(--accent-lt);
-  color: var(--accent);
-  border: 1px solid var(--accent-bd);
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-/* Messages */
-.messages-area {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 22px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.messages-area::-webkit-scrollbar { width: 4px; }
-.messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.empty-room {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--muted);
-  text-align: center;
-  padding: 40px;
-  pointer-events: none;
-}
-
-.empty-icon {
-  font-size: 36px;
-  opacity: 0.35;
-}
-
-.empty-label { font-size: 14px; font-style: italic; }
-
-/* System event messages */
-.sys-event {
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 10px 0 6px;
-  font-style: italic;
-  animation: fadeIn 0.3s ease;
-}
-
-/* Message rows */
-.msg-row {
-  display: flex;
-  flex-direction: column;
-  max-width: 75%;
-  animation: msgIn 0.22s cubic-bezier(0.16,1,0.3,1) both;
-}
-
-.msg-row.mine   { align-self: flex-end; align-items: flex-end; }
-.msg-row.theirs { align-self: flex-start; align-items: flex-start; }
-
-.msg-sender {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--muted);
-  margin-bottom: 4px;
-  padding: 0 4px;
-  letter-spacing: 0.02em;
-}
-
-.bubble {
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 14.5px;
-  line-height: 1.55;
-  word-break: break-word;
-}
-
-.msg-row.mine .bubble {
-  background: var(--accent);
-  color: #fff;
-  border-bottom-right-radius: 4px;
-}
-
-.msg-row.theirs .bubble {
-  background: var(--other-bg);
-  border: 1px solid var(--other-bd);
-  color: var(--text);
-  border-bottom-left-radius: 4px;
-}
-
-.msg-time {
-  font-size: 10.5px;
-  color: var(--muted);
-  padding: 3px 4px 0;
-}
-
-/* Spacing between same-sender runs vs different */
-.msg-row + .msg-row.mine,
-.msg-row + .msg-row.theirs { margin-top: 10px; }
-.msg-row.mine + .msg-row.mine,
-.msg-row.theirs + .msg-row.theirs { margin-top: 2px; }
-
-/* Typing */
-.typing-bar {
-  padding: 4px 22px 6px;
-  min-height: 22px;
-  font-size: 12px;
-  color: var(--muted);
-  font-style: italic;
-  flex-shrink: 0;
-}
-
-/* Input area */
-.input-area {
-  padding: 12px 16px 16px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  flex-shrink: 0;
-}
-
-.msg-input {
-  flex: 1;
-  padding: 11px 16px;
-  font-family: 'Instrument Sans', sans-serif;
-  font-size: 14.5px;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  color: var(--text);
-  resize: none;
-  min-height: 44px;
-  max-height: 130px;
-  outline: none;
-  line-height: 1.5;
-  transition: border-color 0.2s;
-}
-
-.msg-input::placeholder { color: var(--muted); }
-.msg-input:focus { border-color: var(--accent); }
-
-.send-btn {
-  width: 44px;
-  height: 44px;
-  background: var(--accent);
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: opacity 0.2s, transform 0.15s;
-}
-
-.send-btn:hover { opacity: 0.85; transform: scale(1.05); }
-.send-btn:active { transform: scale(0.95); }
-.send-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
-.send-btn svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-
-/* ── Connecting overlay ── */
-.connecting {
-  position: fixed;
-  inset: 0;
-  background: rgba(247,244,239,0.85);
-  backdrop-filter: blur(4px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  z-index: 100;
-  font-size: 14px;
-  color: var(--muted);
-  display: none;
-}
-
-.connecting.show { display: flex; }
-
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 2.5px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-/* ── Animations ── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes msgIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Responsive ── */
-@media (max-width: 500px) {
-  .landing-card { padding: 32px 24px; }
-  .chat-shell { border-radius: 0; height: 100vh; max-width: 100%; }
-  body { padding: 0; }
-  #chatScreen { padding: 0; }
-}
+  .loading-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(11,29,53,0.95);
+    z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border-mid);
+    border-top-color: var(--gold); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim); }
 </style>
 </head>
 <body>
 
-<!-- ── Connecting overlay ── -->
-<div class="connecting" id="connecting">
-  <div class="spinner"></div>
-  <span>Connecting…</span>
+<!-- ══════════ LOADING OVERLAY ══════════ -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <p class="loading-text" id="loading-text">Preparing your examination…</p>
 </div>
 
-<!-- ── LANDING ── -->
-<div class="screen active" id="landingScreen">
-  <div class="landing-card">
-    <div class="logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+<!-- ══════════ PAGE: START ══════════ -->
+<div id="page-start" class="page active">
+  <header class="site-header">
+    <div class="crest">E</div>
+    <h1>English Proficiency Examination</h1>
+    <p class="subtitle">Official Language Assessment Centre</p>
+  </header>
+  <div class="main">
+    <div class="card">
+      <h2 class="card-title">Begin Your Examination</h2>
+      <p class="card-sub">Student Registration</p>
+      <div class="form-group">
+        <label for="student-name">Full Name</label>
+        <input type="text" id="student-name" placeholder="Enter your full name" autocomplete="off">
+        <p class="err" id="name-err">Please enter your name to proceed.</p>
       </div>
-      <div class="logo-name">Ephemeral</div>
-    </div>
-
-    <div class="landing-headline">Chat that leaves<br><em>no trace.</em></div>
-    <div class="landing-sub">Enter a display name to join. When you leave, everything disappears — no history, no logs, no record.</div>
-
-    <div class="form-group">
-      <label for="nicknameInput">Display name</label>
-      <input type="text" id="nicknameInput" placeholder="e.g. Alex" maxlength="30" autocomplete="off" autofocus />
-      <div class="error-msg" id="errorMsg"></div>
-    </div>
-
-    <button class="join-btn" id="joinBtn" disabled>Join Chat Room →</button>
-
-    <div class="privacy-note">
-      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span>No account needed. Messages exist only in memory and are wiped the moment you disconnect or refresh.</span>
+      <div style="background:var(--navy);border:1px solid var(--border);border-radius:3px;padding:1.2rem 1.5rem;font-size:0.82rem;color:var(--cream-dim);line-height:1.8;">
+        <strong style="color:var(--cream);display:block;margin-bottom:0.4rem;">Examination Guidelines</strong>
+        30 multiple-choice questions &nbsp;·&nbsp; 45 minutes<br>
+        One answer per question &nbsp;·&nbsp; No dictionaries permitted<br>
+        Do not close the browser during the exam
+      </div>
+      <button class="btn" onclick="startExam()">Start Examination →</button>
+      <button class="btn btn-outline" onclick="showPage('page-admin-login')">Examiner Login</button>
     </div>
   </div>
+  <footer class="site-footer">© 2025 English Proficiency Assessment Centre &nbsp;·&nbsp; All Rights Reserved</footer>
 </div>
 
-<!-- ── CHAT ── -->
-<div class="screen" id="chatScreen">
-  <div class="chat-shell">
-    <div class="chat-header">
-      <div class="chat-logo">
-        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      </div>
-      <div class="chat-header-info">
-        <div class="chat-room-name">Chat Room</div>
-        <div class="chat-room-sub">
-          <span class="online-pip"></span>
-          <span id="onlineCount">1 online</span>
+<!-- ══════════ PAGE: EXAM ══════════ -->
+<div id="page-exam" class="page">
+  <header class="site-header" style="padding:1.5rem 2rem;">
+    <h1 style="font-size:1.1rem;">English Proficiency Examination</h1>
+  </header>
+  <div class="main" style="padding:1.5rem 1rem 3rem; align-items:flex-start;">
+    <div class="exam-wrap">
+      <div class="exam-topbar">
+        <div class="student-info">
+          <span>Candidate</span>
+          <strong id="topbar-name">—</strong>
+        </div>
+        <div class="timer-box" id="timer-box">
+          <div class="timer-label">Time Remaining</div>
+          <div class="timer-val" id="timer-display">45:00</div>
         </div>
       </div>
-      <div class="my-badge" id="myBadge"></div>
-    </div>
 
-    <div class="messages-area" id="messagesArea">
-      <div class="empty-room" id="emptyRoom">
-        <div class="empty-icon">💬</div>
-        <div class="empty-label">Be the first to say something.</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div class="question-card">
+        <div class="q-number" id="q-number">Question 1 of 30</div>
+        <div class="q-text" id="q-text"></div>
+        <div class="options" id="q-options"></div>
+      </div>
+
+      <div class="unanswered-warn" id="unanswered-warn">⚠ Please select an answer to continue, or use Submit Exam to finish.</div>
+
+      <div class="exam-nav">
+        <button class="nav-btn" id="btn-prev" onclick="prevQ()" disabled>← Previous</button>
+        <div class="q-counter">Question <span id="q-cur">1</span> of <span id="q-total">30</span></div>
+        <button class="nav-btn primary" id="btn-next" onclick="nextQ()">Next →</button>
       </div>
     </div>
+  </div>
+  <footer class="site-footer">© 2025 English Proficiency Assessment Centre &nbsp;·&nbsp; All Rights Reserved</footer>
+</div>
 
-    <div class="typing-bar" id="typingBar"></div>
+<!-- ══════════ PAGE: DONE ══════════ -->
+<div id="page-done" class="page">
+  <header class="site-header">
+    <div class="crest">E</div>
+    <h1>English Proficiency Examination</h1>
+    <p class="subtitle">Official Language Assessment Centre</p>
+  </header>
+  <div class="main">
+    <div class="card done-card">
+      <div class="done-icon">✓</div>
+      <h2 class="card-title">Examination Submitted</h2>
+      <p>Thank you, <strong id="done-name">—</strong>. Your examination has been recorded.</p>
+      <div class="meta">
+        Time Used: <strong id="done-time">—</strong>
+      </div>
+      <p style="font-size:0.85rem;">Your results have been saved. Please inform your examiner.</p>
+      <button class="btn" onclick="showPage('page-start')">Return to Start</button>
+    </div>
+  </div>
+  <footer class="site-footer">© 2025 English Proficiency Assessment Centre &nbsp;·&nbsp; All Rights Reserved</footer>
+</div>
 
-    <div class="input-area">
-      <textarea class="msg-input" id="msgInput" placeholder="Type a message…" rows="1"></textarea>
-      <button class="send-btn" id="sendBtn" disabled>
-        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
+<!-- ══════════ PAGE: ADMIN LOGIN ══════════ -->
+<div id="page-admin-login" class="page">
+  <header class="site-header">
+    <div class="crest">E</div>
+    <h1>English Proficiency Examination</h1>
+    <p class="subtitle">Official Language Assessment Centre</p>
+  </header>
+  <div class="main">
+    <div class="card">
+      <h2 class="card-title">Examiner Access</h2>
+      <p class="card-sub">Restricted Area</p>
+      <div class="form-group">
+        <label for="admin-pass">Password</label>
+        <input type="password" id="admin-pass" placeholder="Enter examiner password" onkeydown="if(event.key==='Enter')adminLogin()">
+        <p class="err" id="pass-err">Incorrect password. Please try again.</p>
+      </div>
+      <button class="btn" onclick="adminLogin()">Sign In →</button>
+      <button class="btn btn-outline" onclick="showPage('page-start')">← Return to Exam</button>
+    </div>
+  </div>
+  <footer class="site-footer">© 2025 English Proficiency Assessment Centre &nbsp;·&nbsp; All Rights Reserved</footer>
+</div>
+
+<!-- ══════════ PAGE: ADMIN PANEL ══════════ -->
+<div id="page-admin" class="page">
+  <header class="site-header" style="padding:1.5rem 2rem; display:flex; justify-content:space-between; align-items:center;">
+    <h1 style="font-size:1.1rem;">Examiner Dashboard</h1>
+  </header>
+  <div class="main" style="padding:1.5rem 1rem 3rem; align-items:flex-start;">
+    <div class="admin-wrap">
+      <div class="admin-header">
+        <div>
+          <h2>Examination Results</h2>
+          <p style="font-size:0.8rem;color:var(--cream-dim);margin-top:0.25rem;">All submitted student examinations</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;">
+          <span class="admin-badge">Examiner Access</span>
+          <button class="export-btn" onclick="exportCSV()">Export CSV</button>
+          <button class="logout-btn" onclick="adminLogout()">Sign Out</button>
+        </div>
+      </div>
+
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-val" id="stat-total">0</div><div class="stat-label">Total Candidates</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-avg">—</div><div class="stat-label">Avg. Score</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-top">—</div><div class="stat-label">Top Level</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-avgtime">—</div><div class="stat-label">Avg. Time</div></div>
+      </div>
+
+      <div class="results-table-wrap">
+        <div class="table-header">
+          <h3>Candidate Results</h3>
+          <span style="font-size:0.75rem;color:var(--cream-dim)" id="result-count">0 results</span>
+        </div>
+        <div id="results-body">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>No examination results yet.<br>Results will appear here as students submit their exams.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer class="site-footer">© 2025 English Proficiency Assessment Centre &nbsp;·&nbsp; All Rights Reserved</footer>
+</div>
+
+<!-- ══════════ CONFIRM SUBMIT OVERLAY ══════════ -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Submit Examination?</h3>
+    <p id="confirm-msg">You are about to submit your answers. This action cannot be undone.</p>
+    <div class="confirm-btns">
+      <button class="btn btn-outline" style="margin:0" onclick="closeConfirm()">Review Answers</button>
+      <button class="btn" style="margin:0" onclick="submitExam()">Submit Now</button>
     </div>
   </div>
 </div>
 
-<!-- Socket.io client — loaded from same server -->
-<script src="/socket.io/socket.io.js"></script>
 <script>
-/* ══════════════════════════════════════════════
-   EPHEMERAL CHAT — CLIENT
-   - Zero persistence: all state is in JS memory
-   - Refresh = blank slate, treated as new user
-   - No localStorage / sessionStorage usage
-══════════════════════════════════════════════ */
+// ══════════ QUESTION BANK ══════════
+// Each question has a unique ID, level, question text, options, and answer index.
+// Bank has 10 questions per level (A1, A2, B1, B2, C1) = 50 total.
+// Each exam picks 6 per level = 30 questions. This allows multiple rotation sets.
 
-// ── State (all in RAM, wiped on refresh/close) ──
-let myNickname   = null;
-let socket       = null;
-let typingTimer  = null;
-let typingMap    = new Map(); // nickname → timeoutId
-let msgCount     = 0;
+const QUESTION_BANK = [
+  // ── A1 (ids 0–9) ──
+  { id: 0,  level: "A1", q: "What ___ your name?",                             opts: ["is","are","am","be"],                                 a: 0 },
+  { id: 1,  level: "A1", q: "She ___ a doctor.",                               opts: ["is","are","am","been"],                               a: 0 },
+  { id: 2,  level: "A1", q: "___ you from London?",                            opts: ["Do","Are","Is","Have"],                               a: 1 },
+  { id: 3,  level: "A1", q: "I have ___ apple.",                               opts: ["a","an","the","some"],                                a: 1 },
+  { id: 4,  level: "A1", q: "They ___ happy.",                                 opts: ["is","am","are","were"],                               a: 2 },
+  { id: 5,  level: "A1", q: "The cat is ___ the table.",                       opts: ["on","in","at","of"],                                  a: 0 },
+  { id: 6,  level: "A1", q: "How ___ brothers do you have?",                   opts: ["many","much","few","little"],                         a: 0 },
+  { id: 7,  level: "A1", q: "This is ___ book.",                               opts: ["a","an","the","—"],                                   a: 0 },
+  { id: 8,  level: "A1", q: "I ___ ten years old.",                            opts: ["have","am","is","be"],                                a: 1 },
+  { id: 9,  level: "A1", q: "We ___ in a small house.",                        opts: ["living","lived","live","lives"],                      a: 2 },
 
-// ── DOM refs ──
-const landingScreen  = document.getElementById('landingScreen');
-const chatScreen     = document.getElementById('chatScreen');
-const nicknameInput  = document.getElementById('nicknameInput');
-const joinBtn        = document.getElementById('joinBtn');
-const errorMsg       = document.getElementById('errorMsg');
-const messagesArea   = document.getElementById('messagesArea');
-const emptyRoom      = document.getElementById('emptyRoom');
-const msgInput       = document.getElementById('msgInput');
-const sendBtn        = document.getElementById('sendBtn');
-const typingBar      = document.getElementById('typingBar');
-const onlineCount    = document.getElementById('onlineCount');
-const myBadge        = document.getElementById('myBadge');
-const connecting     = document.getElementById('connecting');
+  // ── A2 (ids 10–19) ──
+  { id: 10, level: "A2", q: "He ___ to school every day.",                     opts: ["go","goes","going","gone"],                           a: 1 },
+  { id: 11, level: "A2", q: "I ___ a letter yesterday.",                       opts: ["write","writes","writing","wrote"],                   a: 3 },
+  { id: 12, level: "A2", q: "She can ___ very fast.",                          opts: ["runs","running","run","ran"],                         a: 2 },
+  { id: 13, level: "A2", q: "There ___ some milk in the fridge.",              opts: ["are","am","is","be"],                                 a: 2 },
+  { id: 14, level: "A2", q: "We ___ to Paris next week.",                      opts: ["go","goes","are going","gone"],                       a: 2 },
+  { id: 15, level: "A2", q: "She ___ TV when I called.",                       opts: ["watched","watches","was watching","is watching"],     a: 2 },
+  { id: 16, level: "A2", q: "I ___ never been to Japan.",                      opts: ["have","had","has","was"],                             a: 0 },
+  { id: 17, level: "A2", q: "They ___ football last Sunday.",                  opts: ["play","plays","played","playing"],                    a: 2 },
+  { id: 18, level: "A2", q: "___ she like coffee?",                            opts: ["Do","Does","Is","Has"],                               a: 1 },
+  { id: 19, level: "A2", q: "I ___ my keys. I can't find them.",               opts: ["lose","lost","am losing","have lost"],                a: 3 },
 
-// ── Nickname input validation ──
-nicknameInput.addEventListener('input', () => {
-  joinBtn.disabled = nicknameInput.value.trim().length < 1;
-  hideError();
-});
+  // ── B1 (ids 20–29) ──
+  { id: 20, level: "B1", q: "If it rains tomorrow, we ___ stay at home.",      opts: ["will","would","should","shall"],                      a: 0 },
+  { id: 21, level: "B1", q: "She has ___ in this company for five years.",     opts: ["worked","been working","working","work"],             a: 1 },
+  { id: 22, level: "B1", q: "I wish I ___ more time to finish the project.",   opts: ["have","will have","had","has"],                       a: 2 },
+  { id: 23, level: "B1", q: "The book ___ written by a famous author.",        opts: ["is","was","were","has"],                              a: 1 },
+  { id: 24, level: "B1", q: "By the time he arrived, we ___ dinner already.",  opts: ["finished","finish","were finishing","had finished"],  a: 3 },
+  { id: 25, level: "B1", q: "He asked me where I ___.",                        opts: ["live","will live","lived","am living"],               a: 2 },
+  { id: 26, level: "B1", q: "She suggested ___ a new approach.",               opts: ["try","to try","tried","trying"],                      a: 3 },
+  { id: 27, level: "B1", q: "He ___ be tired after such a long journey.",      opts: ["must","have to","shall","ought"],                     a: 0 },
+  { id: 28, level: "B1", q: "Neither the students nor the teacher ___ ready.", opts: ["were","was","are","is"],                              a: 3 },
+  { id: 29, level: "B1", q: "I ___ rather you didn't mention this to anyone.", opts: ["would","should","might","could"],                     a: 0 },
 
-nicknameInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); attemptJoin(); }
-});
+  // ── B2 (ids 30–39) ──
+  { id: 30, level: "B2", q: "___ he been working here long enough to qualify?",                  opts: ["Have","Has","Is","Was"],                  a: 1 },
+  { id: 31, level: "B2", q: "Despite ___ tired, she continued working through the night.",       opts: ["to be","be","been","being"],              a: 3 },
+  { id: 32, level: "B2", q: "The new policy is aimed ___ reducing carbon emissions.",            opts: ["on","in","at","to"],                      a: 2 },
+  { id: 33, level: "B2", q: "It is high time the government ___ action on climate change.",      opts: ["take","taking","took","will take"],        a: 2 },
+  { id: 34, level: "B2", q: "Not only ___ he forget the meeting, but he also misplaced the files.", opts: ["does","has","did","had"],              a: 2 },
+  { id: 35, level: "B2", q: "The experiment was conducted under strictly ___ laboratory conditions.", opts: ["controlling","control","controls","controlled"], a: 3 },
+  { id: 36, level: "B2", q: "She insisted on ___ compensated for the damages.",                  opts: ["being","been","to be","be"],              a: 0 },
+  { id: 37, level: "B2", q: "The results were ___ to be conclusive without further testing.",    opts: ["too preliminary","very preliminary","so preliminary","quite preliminary"], a: 0 },
+  { id: 38, level: "B2", q: "___ the circumstances, the decision seemed reasonable.",            opts: ["Given","Giving","Being given","Having given"], a: 0 },
+  { id: 39, level: "B2", q: "The proposal met with ___ from senior management.",                 opts: ["resistance","resistant","resisting","resisted"], a: 0 },
 
-joinBtn.addEventListener('click', attemptJoin);
+  // ── C1 (ids 40–49) ──
+  { id: 40, level: "C1", q: "The report, ___ was published last month, has caused significant controversy.", opts: ["that","which","who","whom"], a: 1 },
+  { id: 41, level: "C1", q: "She would rather you ___ her before making any decisions.",         opts: ["call","calling","called","to call"],      a: 2 },
+  { id: 42, level: "C1", q: "No sooner ___ he arrived than the situation began to deteriorate.", opts: ["did","has","had","was"],                  a: 2 },
+  { id: 43, level: "C1", q: "The legislation is predicated ___ the assumption that all citizens are treated equally.", opts: ["on","in","at","by"], a: 0 },
+  { id: 44, level: "C1", q: "___ to the severe lack of funding, the research project was ultimately abandoned.", opts: ["Despite","Regarding","Owing","Since"], a: 2 },
+  { id: 45, level: "C1", q: "Had I known about the underlying problem sooner, I ___ much earlier.", opts: ["would intervene","would have intervened","will have intervened","had intervened"], a: 1 },
+  { id: 46, level: "C1", q: "The committee was at pains to emphasise that the findings were ___ inconclusive.", opts: ["highly","by no means","somewhat","rather"], a: 1 },
+  { id: 47, level: "C1", q: "The phenomenon ___ to as 'cognitive dissonance' was first described in the 1950s.", opts: ["referring","being referred","referred","is referred"], a: 2 },
+  { id: 48, level: "C1", q: "It was not until the final chapter ___ the true identity of the narrator revealed.", opts: ["when was","that was","was","that was not"], a: 1 },
+  { id: 49, level: "C1", q: "The sheer scale of the undertaking ___ many experienced observers.",  opts: ["daunted","daunting","was daunt","to daunt"], a: 0 },
+];
 
-function attemptJoin() {
-  const name = nicknameInput.value.trim();
-  if (!name) return;
-  joinBtn.disabled = true;
-  connecting.classList.add('show');
-  initSocket(name);
+// ══════════ CONFIG ══════════
+const ADMIN_PASSWORD  = "Examiner@2025";
+const EXAM_DURATION   = 45 * 60;
+const QS_PER_LEVEL    = 6; // 6 × 5 levels = 30 questions per exam
+const LEVELS          = ["A1","A2","B1","B2","C1"];
+
+// ══════════ STATE ══════════
+let studentName   = "";
+let studentKey    = "";   // lowercase trimmed key for Firestore doc id
+let QUESTIONS     = [];   // the 30 questions selected for this session
+let answers       = [];
+let currentQ      = 0;
+let timerInterval = null;
+let timeLeft      = EXAM_DURATION;
+let adminResults  = [];   // cached for export
+
+// ══════════ HELPERS ══════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
 }
 
-// ── Socket init ──
-function initSocket(nickname) {
-  socket = io({ transports: ['websocket', 'polling'] });
+function showLoading(text = "Please wait…") {
+  document.getElementById('loading-text').textContent = text;
+  document.getElementById('loading-overlay').classList.add('show');
+}
 
-  socket.on('connect', () => {
-    socket.emit('join', nickname);
-  });
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
 
-  socket.on('connect_error', () => {
-    connecting.classList.remove('show');
-    showError('Could not connect to server. Is it running?');
-    joinBtn.disabled = false;
-  });
+function shuffle(arr) {
+  // Fisher-Yates
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
-  socket.on('join_success', ({ nickname: confirmedName, onlineCount: count }) => {
-    myNickname = confirmedName;
-    connecting.classList.remove('show');
-    showChatScreen(confirmedName, count);
-  });
+// ══════════ QUESTION SELECTION (rotation logic) ══════════
+function selectQuestions(usedIds) {
+  const usedSet = new Set(usedIds);
+  const selected = [];
 
-  socket.on('join_error', (msg) => {
-    connecting.classList.remove('show');
-    showError(msg);
-    joinBtn.disabled = false;
-    socket.disconnect();
-  });
+  for (const level of LEVELS) {
+    const pool = QUESTION_BANK.filter(q => q.level === level);
+    const unused = pool.filter(q => !usedSet.has(q.id));
+    const fallback = pool.filter(q => usedSet.has(q.id)); // previously used, only if needed
 
-  socket.on('message', (msg) => {
-    appendMessage(msg);
-    // Clear typing for this sender when message arrives
-    clearTypingFor(msg.nickname);
-  });
+    let levelPick = [];
 
-  socket.on('user_joined', ({ nickname: who, onlineCount: count }) => {
-    if (who !== myNickname) addSysEvent(`${who} joined the room`);
-    updateOnlineCount(count);
-  });
-
-  socket.on('user_left', ({ nickname: who, onlineCount: count }) => {
-    addSysEvent(`${who} left the room`);
-    updateOnlineCount(count);
-    clearTypingFor(who);
-  });
-
-  socket.on('typing', ({ nickname: who, isTyping }) => {
-    if (isTyping) {
-      showTypingFor(who);
+    if (unused.length >= QS_PER_LEVEL) {
+      // Enough fresh questions — pick from unused only
+      levelPick = shuffle([...unused]).slice(0, QS_PER_LEVEL);
     } else {
-      clearTypingFor(who);
+      // Not enough fresh — use all unused first, fill remaining from used (shuffled)
+      levelPick = [...shuffle([...unused]), ...shuffle([...fallback])].slice(0, QS_PER_LEVEL);
+      // Reset this level's used IDs so next time they're treated as fresh again
+      fallback.forEach(q => usedSet.delete(q.id));
     }
-  });
 
-  socket.on('disconnect', () => {
-    // Page is closing or server dropped — do nothing, browser clears state
-  });
-}
-
-// ── Show chat screen ──
-function showChatScreen(name, count) {
-  landingScreen.classList.remove('active');
-  chatScreen.classList.add('active');
-  myBadge.textContent = name;
-  updateOnlineCount(count);
-  msgInput.focus();
-}
-
-// ── Online count ──
-function updateOnlineCount(count) {
-  onlineCount.textContent = `${count} online`;
-}
-
-// ── System event line ──
-function addSysEvent(text) {
-  const el = document.createElement('div');
-  el.className = 'sys-event';
-  el.textContent = text;
-  removeEmpty();
-  messagesArea.appendChild(el);
-  scrollBottom();
-}
-
-// ── Append message ──
-function appendMessage({ nickname, text, timestamp }) {
-  removeEmpty();
-  msgCount++;
-
-  const isMe = nickname === myNickname;
-  const time  = formatTime(timestamp);
-
-  // Check if same sender as previous message bubble
-  const lastRow = messagesArea.querySelector('.msg-row:last-of-type');
-  const sameSender = lastRow && lastRow.dataset.sender === nickname;
-
-  const row = document.createElement('div');
-  row.className = `msg-row ${isMe ? 'mine' : 'theirs'}`;
-  row.dataset.sender = nickname;
-
-  if (!sameSender) {
-    const senderEl = document.createElement('div');
-    senderEl.className = 'msg-sender';
-    senderEl.textContent = isMe ? 'You' : nickname;
-    row.appendChild(senderEl);
+    selected.push(...levelPick);
   }
 
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  bubble.innerHTML = text; // already sanitized server-side
-
-  const timeEl = document.createElement('div');
-  timeEl.className = 'msg-time';
-  timeEl.textContent = time;
-
-  row.appendChild(bubble);
-  row.appendChild(timeEl);
-  messagesArea.appendChild(row);
-  scrollBottom();
+  return selected; // 30 questions, ordered by level (A1→C1)
 }
 
-function removeEmpty() {
-  if (emptyRoom) emptyRoom.style.display = 'none';
+// ══════════ EXAM START ══════════
+async function startExam() {
+  const nameInput = document.getElementById('student-name').value.trim();
+  if (!nameInput) {
+    document.getElementById('name-err').style.display = 'block';
+    return;
+  }
+
+  studentName = nameInput;
+  studentKey  = nameInput.toLowerCase().replace(/\s+/g, '_');
+
+  showLoading("Preparing your examination…");
+
+  try {
+    // Fetch the student's question history from Firestore
+    const usedIds = await window.getUsedQuestionIds(studentKey);
+
+    // Select 30 questions, rotating away from previously used ones
+    QUESTIONS = selectQuestions(usedIds);
+
+    // Persist the newly used question IDs back to Firestore
+    const newUsedIds = [...new Set([...usedIds, ...QUESTIONS.map(q => q.id)])];
+    await window.saveUsedQuestionIds(studentKey, newUsedIds);
+
+    // Reset exam state
+    answers  = new Array(QUESTIONS.length).fill(null);
+    currentQ = 0;
+    timeLeft = EXAM_DURATION;
+
+    document.getElementById('topbar-name').textContent = studentName;
+    document.getElementById('q-total').textContent = QUESTIONS.length;
+    renderQuestion(0);
+    startTimer();
+
+    hideLoading();
+    showPage('page-exam');
+  } catch (err) {
+    hideLoading();
+    alert("Could not connect to the database. Please check your internet connection and try again.");
+    console.error(err);
+  }
 }
 
-function scrollBottom() {
-  messagesArea.scrollTop = messagesArea.scrollHeight;
+// ══════════ RENDER ══════════
+function renderQuestion(idx) {
+  const q = QUESTIONS[idx];
+  document.getElementById('q-number').textContent = `Question ${idx + 1} of ${QUESTIONS.length}`;
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('q-cur').textContent = idx + 1;
+  document.getElementById('progress-fill').style.width = `${((idx + 1) / QUESTIONS.length) * 100}%`;
+
+  const optContainer = document.getElementById('q-options');
+  optContainer.innerHTML = '';
+  const letters = ['A','B','C','D'];
+  q.opts.forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'option' + (answers[idx] === i ? ' selected' : '');
+    div.innerHTML = `<span class="option-letter">${letters[i]}</span><span class="option-text">${opt}</span>`;
+    div.onclick = () => selectAnswer(idx, i);
+    optContainer.appendChild(div);
+  });
+
+  document.getElementById('btn-prev').disabled = idx === 0;
+
+  const isLast = idx === QUESTIONS.length - 1;
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.textContent = isLast ? 'Submit Exam ✓' : 'Next →';
+  nextBtn.onclick = isLast ? confirmSubmit : nextQ;
+
+  document.getElementById('unanswered-warn').style.display = 'none';
 }
 
-function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function selectAnswer(qIdx, optIdx) {
+  answers[qIdx] = optIdx;
+  renderQuestion(qIdx);
 }
 
-// ── Typing indicators ──
-function showTypingFor(who) {
-  clearTimeout(typingMap.get(who));
-  typingMap.set(who, setTimeout(() => clearTypingFor(who), 3000));
-  renderTyping();
+function prevQ() {
+  if (currentQ > 0) { currentQ--; renderQuestion(currentQ); }
 }
 
-function clearTypingFor(who) {
-  clearTimeout(typingMap.get(who));
-  typingMap.delete(who);
-  renderTyping();
+function nextQ() {
+  if (currentQ < QUESTIONS.length - 1) { currentQ++; renderQuestion(currentQ); }
 }
 
-function renderTyping() {
-  const names = [...typingMap.keys()];
-  if (names.length === 0) {
-    typingBar.textContent = '';
-  } else if (names.length === 1) {
-    typingBar.textContent = `${names[0]} is typing…`;
+// ══════════ SUBMIT ══════════
+function confirmSubmit() {
+  const unanswered = answers.filter(a => a === null).length;
+  document.getElementById('confirm-msg').textContent = unanswered > 0
+    ? `You have ${unanswered} unanswered question${unanswered > 1 ? 's' : ''}. Are you sure you want to submit? Unanswered questions will be marked as incorrect.`
+    : 'You have answered all 30 questions. Are you sure you want to submit your examination?';
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('show');
+}
+
+async function submitExam() {
+  closeConfirm();
+  clearInterval(timerInterval);
+
+  const timeUsedSec = EXAM_DURATION - timeLeft;
+  const timeUsedStr = formatTime(timeUsedSec);
+
+  let correct = 0, wrong = 0;
+  QUESTIONS.forEach((q, i) => {
+    if (answers[i] === q.a) correct++;
+    else wrong++;
+  });
+
+  const level = calcLevel(correct);
+  const submitTimestamp = new Date().toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  const result = {
+    name: studentName,
+    correct, wrong,
+    total: QUESTIONS.length,
+    level, timeUsed: timeUsedStr,
+    submitted: submitTimestamp,
+    questionIds: QUESTIONS.map(q => q.id) // store which questions were used
+  };
+
+  showLoading("Saving your results…");
+  await window.saveResultToFirestore(result);
+  hideLoading();
+
+  document.getElementById('done-name').textContent = studentName;
+  document.getElementById('done-time').textContent = timeUsedStr;
+  showPage('page-done');
+}
+
+function calcLevel(correct) {
+  if (correct <= 5)  return 'A1';
+  if (correct <= 10) return 'A2';
+  if (correct <= 16) return 'B1';
+  if (correct <= 22) return 'B2';
+  return 'C1';
+}
+
+// ══════════ TIMER ══════════
+function startTimer() {
+  clearInterval(timerInterval);
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 300) document.getElementById('timer-box').classList.add('warning');
+    if (timeLeft <= 0) { clearInterval(timerInterval); submitExam(); }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  document.getElementById('timer-display').textContent = formatTime(timeLeft);
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+// ══════════ ADMIN ══════════
+function adminLogin() {
+  const pass = document.getElementById('admin-pass').value;
+  if (pass === ADMIN_PASSWORD) {
+    document.getElementById('admin-pass').value = '';
+    document.getElementById('pass-err').style.display = 'none';
+    loadAdminPanel();
+    showPage('page-admin');
   } else {
-    typingBar.textContent = `${names.slice(0,-1).join(', ')} and ${names.at(-1)} are typing…`;
+    document.getElementById('pass-err').style.display = 'block';
   }
 }
 
-// ── Message sending ──
-msgInput.addEventListener('input', () => {
-  sendBtn.disabled = msgInput.value.trim() === '';
-  autoResize();
-  if (socket) {
-    socket.emit('typing', true);
-    clearTimeout(typingTimer);
-    typingTimer = setTimeout(() => socket.emit('typing', false), 1500);
+function adminLogout() { showPage('page-start'); }
+
+async function loadAdminPanel() {
+  showLoading("Loading results…");
+  const results = await window.getAllResults();
+  adminResults = results;
+  hideLoading();
+
+  document.getElementById('stat-total').textContent = results.length;
+  document.getElementById('result-count').textContent = `${results.length} result${results.length !== 1 ? 's' : ''}`;
+
+  if (results.length === 0) {
+    document.getElementById('stat-avg').textContent = '—';
+    document.getElementById('stat-top').textContent = '—';
+    document.getElementById('stat-avgtime').textContent = '—';
+    document.getElementById('results-body').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <p>No examination results yet.<br>Results will appear here as students submit their exams.</p>
+      </div>`;
+    return;
   }
-});
 
-msgInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    doSend();
-  }
-});
+  const avgScore = Math.round(results.reduce((s, r) => s + r.correct, 0) / results.length);
+  const levelCounts = {};
+  results.forEach(r => { levelCounts[r.level] = (levelCounts[r.level] || 0) + 1; });
+  const topLevel = Object.entries(levelCounts).sort((a, b) => b[1] - a[1])[0][0];
 
-sendBtn.addEventListener('click', doSend);
+  let avgTimeSec = 0;
+  results.forEach(r => {
+    const parts = r.timeUsed.split(':');
+    avgTimeSec += parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  });
+  avgTimeSec = Math.round(avgTimeSec / results.length);
 
-function doSend() {
-  const text = msgInput.value.trim();
-  if (!text || !socket) return;
-  socket.emit('message', text);
-  socket.emit('typing', false);
-  clearTimeout(typingTimer);
-  msgInput.value = '';
-  autoResize();
-  sendBtn.disabled = true;
-  msgInput.focus();
+  document.getElementById('stat-avg').textContent = `${avgScore}/30`;
+  document.getElementById('stat-top').textContent = topLevel;
+  document.getElementById('stat-avgtime').textContent = formatTime(avgTimeSec);
+
+  const sorted = [...results].reverse();
+  let rows = '';
+  sorted.forEach(r => {
+    const pct = Math.round((r.correct / r.total) * 100);
+    rows += `<tr>
+      <td class="td-name">${escHtml(r.name)}</td>
+      <td><span class="level-badge level-${r.level}">${r.level}</span></td>
+      <td>
+        <div class="score-bar">
+          <div class="score-mini"><div class="score-mini-fill" style="width:${pct}%"></div></div>
+          <span class="score-text">${r.correct}/${r.total}</span>
+        </div>
+      </td>
+      <td><span class="correct-count">✓ ${r.correct}</span> &nbsp; <span class="wrong-count">✗ ${r.wrong}</span></td>
+      <td class="td-time">${r.timeUsed}</td>
+      <td class="td-time" style="font-size:0.78rem;color:var(--cream-dim)">${r.submitted}</td>
+    </tr>`;
+  });
+
+  document.getElementById('results-body').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Candidate Name</th><th>Level</th>
+          <th style="min-width:150px">Score</th>
+          <th>Correct / Wrong</th><th>Time Used</th><th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
-function autoResize() {
-  msgInput.style.height = 'auto';
-  msgInput.style.height = Math.min(msgInput.scrollHeight, 130) + 'px';
+function exportCSV() {
+  if (!adminResults.length) { alert('No results to export.'); return; }
+  const header = 'Name,Level,Correct,Wrong,Total,Time Used,Submitted\n';
+  const rows = adminResults.map(r =>
+    `"${r.name}","${r.level}",${r.correct},${r.wrong},${r.total},"${r.timeUsed}","${r.submitted}"`
+  ).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'exam_results.csv';
+  a.click();
 }
 
-// ── Error display ──
-function showError(msg) {
-  errorMsg.textContent = msg;
-  errorMsg.classList.add('show');
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-function hideError() {
-  errorMsg.classList.remove('show');
-}
-
-/* ── No persistence guarantee ──
-   There is no localStorage, sessionStorage, or IndexedDB usage anywhere.
-   The socket disconnects automatically on page close/refresh.
-   The server wipes logs when the room empties.
-   This page treats every load as a fresh session.
-*/
 </script>
 </body>
 </html>
